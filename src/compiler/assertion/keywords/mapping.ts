@@ -37,6 +37,10 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     },
 
     // Number
+    multipleOf: (ctx, parentSchema, identifier) => {
+        ctx.conditions[numberIdx].push(`${identifier}%${parentSchema.multipleOf}===0`);
+    },
+
     minimum: (ctx, parentSchema, identifier) => {
         ctx.conditions[numberIdx].push(`${identifier}>=${parentSchema.minimum}`);
     },
@@ -149,13 +153,26 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     },
 
     patternProperties: (ctx, parentSchema, identifier) => {
+        const { root } = ctx;
         const { patternProperties } = parentSchema;
 
         const conditions: string[] = [];
-        for (const key in patternProperties) conditions.push(`(${new RegExp(key).toString()}.test(k)&&!(${ctx.root.compileConditions(patternProperties[key], 'x[k]')}))`);
+        for (const key in patternProperties) conditions.push(`(!${new RegExp(key).toString()}.test(k)||${root.compileConditions(patternProperties[key], `${identifier}[k]`)})`);
 
         if (conditions.length !== 0)
-            ctx.conditions[objectIdx].push(`${ctx.root.addFunc(`(x)=>{for(const k in x)if(${conditions.join('||')})return false;return true;}`)}(${identifier})`);
+            ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${conditions.join('||')})`);
+    },
+
+    propertyNames: (ctx, parentSchema, identifier) => {
+        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${ctx.root.compileConditions(parentSchema.propertyNames!, 'k')})`);
+    },
+
+    minProperties: (ctx, parentSchema, identifier) => {
+        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).length>${parentSchema.minProperties! - 1}`);
+    },
+
+    maxProperties: (ctx, parentSchema, identifier) => {
+        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).length<${parentSchema.maxProperties! + 1}`);
     }
 };
 
