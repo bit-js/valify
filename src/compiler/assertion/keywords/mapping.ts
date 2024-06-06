@@ -38,7 +38,7 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
 
     // Number
     multipleOf: (ctx, parentSchema, identifier) => {
-        ctx.conditions[numberIdx].push(`${identifier}%${parentSchema.multipleOf}===0`);
+        ctx.conditions[numberIdx].push(ctx.root.options.accurateMultipleOf ? `${identifier}/${parentSchema.multipleOf}%1===0` : `${identifier}%${parentSchema.multipleOf}===0`);
     },
 
     minimum: (ctx, parentSchema, identifier) => {
@@ -77,7 +77,7 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
         const arrayConditions = ctx.conditions[arrayIdx];
 
         if (Array.isArray(items))
-            for (let i = 0, { length } = items; i < length; ++i) arrayConditions.push(root.compileConditions((items as Schema[])[i], `${identifier}[${i}]`));
+            for (let i = 0, { length } = items; i < length; ++i) arrayConditions.push(`${identifier}.length===${i}||${root.compileConditions((items as Schema[])[i], `${identifier}[${i}]`)}`);
         else
             arrayConditions.push(`${identifier}.every((x)=>${root.compileConditions(items as Schema, 'x')})`);
     },
@@ -88,7 +88,7 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
 
         if (additionalItems === false) {
             if (Array.isArray(parentSchema.items))
-                ctx.conditions[arrayIdx].push(`${identifier}.length<${parentSchema.items.length + 1}`);
+                ctx.conditions[arrayIdx].push(`${identifier}.length===${parentSchema.items.length}`);
         } else {
             ctx.conditions[arrayIdx].push(Array.isArray(parentSchema.items)
                 ? `${root.addFunc(`(x)=>{for(let i=${parentSchema.items.length},{length}=x;i<length;++i)if(!(${root.compileConditions(additionalItems!, `${identifier}[i]`)}))return false;return true;}`)}(${identifier})`

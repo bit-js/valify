@@ -7,8 +7,10 @@ const tests = suite.loadSync();
 const options = {
   allowNaN: false,
   strictStringWidth: true,
-  noArrayObject: true
+  noArrayObject: true,
+  accurateMultipleOf: true
 };
+
 const ignoredSuites = [
   'refRemote', 'ref',
 

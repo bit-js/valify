@@ -6,6 +6,7 @@ export interface Options {
     allowNaN?: boolean;
     strictStringWidth?: boolean;
     noArrayObject?: boolean;
+    accurateMultipleOf?: boolean;
 }
 
 export class RootContext {
@@ -25,6 +26,7 @@ export class RootContext {
         options.allowNaN ??= false;
         options.strictStringWidth ??= false;
         options.noArrayObject ??= false;
+        options.accurateMultipleOf ??= false;
         // @ts-expect-error Unset properties have been handled previously
         this.options = options;
     }
