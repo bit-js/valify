@@ -7,6 +7,8 @@ export function inspect(schema: Schema, options: Options = {}): string {
     return `${root.declarations.join(';')};return (x)=>${conditions}`;
 }
 
-export function evaluate<T extends Schema>(schema: Schema, options: Options = {}): ((x: any) => x is FromSchema<T>) {
+export type Assert<T extends Schema> = (x: any) => x is FromSchema<T>;
+
+export function evaluate<const T extends Schema>(schema: Schema, options: Options = {}): Assert<T> {
     return Function(inspect(schema, options))();
 }

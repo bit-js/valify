@@ -2,7 +2,7 @@
 import type { Schema } from '../../../types/schema';
 import type { Context } from '../context';
 
-import { arrayIdx, noTypeIdx, numberIdx, stringIdx } from './utils';
+import { arrayIdx, noTypeIdx, numberIdx, objectIdx, stringIdx } from './utils';
 
 const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boolean>, identifier: string) => void> = {
     // Generic keywords
@@ -117,6 +117,17 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
 
         if (typeof minContains === 'number' || typeof maxContains === 'number')
             ctx.conditions[arrayIdx].push(`${root.addFunc(`(x)=>{let c=0;for(let i=0,{length}=x;i<length;++i)c+=${root.compileConditions(contains!, 'x[i]')};return c>${typeof minContains === 'number' ? minContains - 1 : 0}${typeof maxContains === 'number' ? `&&c<${maxContains + 1}` : ''};}`)}(${identifier})`);
+    },
+
+    // Objects
+    patternProperties: (ctx, parentSchema, identifier) => {
+        const { patternProperties } = parentSchema;
+        const conditions: string[] = [];
+
+        for (const key in patternProperties) conditions.push(`(${new RegExp(key).toString()}.test(k)&&!(${ctx.root.compileConditions(patternProperties[key], 'x[k]')}))`);
+
+        if (conditions.length !== 0)
+            ctx.conditions[objectIdx].push(`${ctx.root.addFunc(`(x)=>{for(const k in x)if(${conditions.join('||')})return false;return true;}`)}(${identifier})`);
     }
 };
 
