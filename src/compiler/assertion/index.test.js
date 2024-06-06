@@ -8,7 +8,8 @@ const options = {
   allowNaN: false,
   strictStringWidth: true,
   noArrayObject: true,
-  accurateMultipleOf: true
+  accurateMultipleOf: true,
+  unicodeAwareRegex: true
 };
 
 const ignoredSuites = [
@@ -18,7 +19,7 @@ const ignoredSuites = [
   'iri-reference', 'ipv4', 'ipv6', 'regex', 'date-time', 'uri-reference', 'relative-json-pointer',
   'idn-hostname', 'uri-template', 'content', 'idn-email',
 
-  'pattern', 'patternProperties', 'uniqueItems', 'dependencies',
+  'patternProperties', 'uniqueItems', 'dependencies',
 
   'oneOf', 'anyOf', 'allOf', 'not', 'if-then-else',
 

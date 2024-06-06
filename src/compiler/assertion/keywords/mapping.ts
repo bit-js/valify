@@ -33,7 +33,7 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     },
 
     pattern: (ctx, parentSchema, identifier) => {
-        ctx.conditions[stringIdx].push(`${new RegExp(parentSchema.pattern!).toString()}.test(${identifier})`);
+        ctx.conditions[stringIdx].push(`${(ctx.root.options.unicodeAwareRegex ? new RegExp(parentSchema.pattern!, 'u') : new RegExp(parentSchema.pattern!)).toString()}.test(${identifier})`);
     },
 
     // Number
@@ -122,9 +122,7 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     properties: (ctx, parentSchema, identifier) => {
         const {
             properties = {},
-            required = [],
-            dependentRequired = {},
-            dependentSchemas = {}
+            required = []
         } = parentSchema;
 
         const { root } = ctx;
@@ -133,13 +131,6 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
         for (const key in properties) {
             const propIdentifier = accessor(identifier, key);
             const conditions = [root.compileConditions(properties[key], propIdentifier)];
-
-            if (key in dependentRequired) {
-                const dependencies = dependentRequired[key];
-                for (let i = 0, { length } = dependencies; i < length; ++i) conditions.push(`${accessor(identifier, dependencies[i])}!==undefined`);
-            }
-
-            if (key in dependentSchemas) conditions.push(root.compileConditions(dependentSchemas[key], identifier));
 
             objectConditions.push(required.includes(key)
                 ? conditions.join('&&')
@@ -160,33 +151,25 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     },
 
     dependentRequired: (ctx, parentSchema, identifier) => {
-        const { properties = {} } = parentSchema;
         const objectConditions = ctx.conditions[objectIdx];
 
         const { dependentRequired } = parentSchema;
         for (const key in dependentRequired!) {
-            if (!(key in properties)) {
-                const conditions = [];
+            const conditions = [];
 
-                const dependencies = dependentRequired[key];
-                for (let i = 0, { length } = dependencies; i < length; ++i) conditions.push(`${accessor(identifier, dependencies[i])}!==undefined`);
+            const dependencies = dependentRequired[key];
+            for (let i = 0, { length } = dependencies; i < length; ++i) conditions.push(`${accessor(identifier, dependencies[i])}!==undefined`);
 
-                objectConditions.push(`(${accessor(identifier, key)}===undefined||${conditions.join('&&')})`);
-            }
+            objectConditions.push(`(${accessor(identifier, key)}===undefined||${conditions.join('&&')})`);
         }
     },
 
     dependentSchemas: (ctx, parentSchema, identifier) => {
-        const { properties = {} } = parentSchema;
-
         const { root } = ctx;
         const objectConditions = ctx.conditions[objectIdx];
 
         const { dependentSchemas } = parentSchema;
-        for (const key in dependentSchemas!) {
-            if (!(key in properties))
-                objectConditions.push(`(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
-        }
+        for (const key in dependentSchemas!) objectConditions.push(`(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
     },
 
     additionalProperties: (ctx, parentSchema, identifier) => {
@@ -210,10 +193,10 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
         const { patternProperties } = parentSchema;
 
         const conditions: string[] = [];
-        for (const key in patternProperties) conditions.push(`(!${new RegExp(key).toString()}.test(k)||${root.compileConditions(patternProperties[key], `${identifier}[k]`)})`);
+        for (const key in patternProperties) conditions.push(`(!${(ctx.root.options.unicodeAwareRegex ? new RegExp(key, 'u') : new RegExp(key)).toString()}.test(k)||${root.compileConditions(patternProperties[key], `${identifier}[k]`)})`);
 
         if (conditions.length !== 0)
-            ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${conditions.join('||')})`);
+            ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${conditions.join('&&')})`);
     },
 
     propertyNames: (ctx, parentSchema, identifier) => {

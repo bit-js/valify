@@ -7,6 +7,7 @@ export interface Options {
     strictStringWidth?: boolean;
     noArrayObject?: boolean;
     accurateMultipleOf?: boolean;
+    unicodeAwareRegex?: boolean;
 }
 
 export class RootContext {
@@ -27,6 +28,7 @@ export class RootContext {
         options.strictStringWidth ??= false;
         options.noArrayObject ??= false;
         options.accurateMultipleOf ??= false;
+        options.unicodeAwareRegex ??= false;
         // @ts-expect-error Unset properties have been handled previously
         this.options = options;
     }
