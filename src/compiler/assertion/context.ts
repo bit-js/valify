@@ -46,7 +46,8 @@ export class RootContext {
     }
 
     public compileConditions(schema: Schema, identifier: string): string {
-        if (typeof schema === 'boolean') return `${schema}`;
+        if (schema === false) return `${identifier}===undefined`;
+        if (schema === true) return `${identifier}!==undefined`;
 
         const ctx = new Context(this);
         // eslint-disable-next-line
@@ -156,7 +157,7 @@ export class Context {
             finalConditions.push(`${identifier}===null`);
 
         return conditions[noTypeIdx].length === 0
-            ? finalConditions.length === 0 ? 'true' : finalConditions.join('||')
+            ? finalConditions.length === 0 ? `${identifier}!==undefined` : finalConditions.join('||')
             : `(${finalConditions.join('||')})&&${conditions[noTypeIdx].join('&&')}`;
     }
 }

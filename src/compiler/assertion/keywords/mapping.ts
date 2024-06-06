@@ -2,7 +2,7 @@
 import type { Schema } from '../../../types/schema';
 import type { Context } from '../context';
 
-import { arrayIdx, noTypeIdx, numberIdx, objectIdx, stringIdx } from './utils';
+import { accessor, arrayIdx, noTypeIdx, numberIdx, objectIdx, stringIdx } from './utils';
 
 const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boolean>, identifier: string) => void> = {
     // Generic keywords
@@ -120,10 +120,38 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     },
 
     // Objects
+    properties: (ctx, parentSchema, identifier) => {
+        const {
+            properties = {},
+            required = [],
+            dependentRequired = {},
+            dependentSchemas = {}
+        } = parentSchema;
+
+        const { root } = ctx;
+        const objectConditions = ctx.conditions[objectIdx];
+
+        for (const key in properties) {
+            const propIdentifier = accessor(identifier, key);
+            const conditions = [root.compileConditions(properties[key], propIdentifier)];
+
+            if (key in dependentRequired) {
+                const dependencies = dependentRequired[key];
+                for (let i = 0, { length } = dependencies; i < length; ++i) conditions.push(`${accessor(identifier, dependencies[i])}!==undefined`);
+            }
+
+            if (key in dependentSchemas) conditions.push(root.compileConditions(dependentSchemas[key], identifier));
+
+            objectConditions.push(required.includes(key)
+                ? conditions.join('&&')
+                : `(${propIdentifier}===undefined||${conditions.join('&&')})`);
+        }
+    },
+
     patternProperties: (ctx, parentSchema, identifier) => {
         const { patternProperties } = parentSchema;
-        const conditions: string[] = [];
 
+        const conditions: string[] = [];
         for (const key in patternProperties) conditions.push(`(${new RegExp(key).toString()}.test(k)&&!(${ctx.root.compileConditions(patternProperties[key], 'x[k]')}))`);
 
         if (conditions.length !== 0)
