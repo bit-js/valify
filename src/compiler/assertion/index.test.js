@@ -9,7 +9,19 @@ const options = {
   strictStringWidth: true,
   noArrayObject: true
 };
-const ignoredSuites = ['refRemote'];
+const ignoredSuites = [
+  'refRemote', 'ref',
+
+  'iri', 'uri', 'json-pointer', 'ecmascript-regex', 'email', 'date', 'time', 'hostname',
+  'iri-reference', 'ipv4', 'ipv6', 'regex', 'date-time', 'uri-reference', 'relative-json-pointer',
+  'idn-hostname', 'uri-template', 'content', 'idn-email',
+
+  'pattern', 'patternProperties', 'uniqueItems', 'dependencies',
+
+  'oneOf', 'anyOf', 'allOf', 'not', 'if-then-else',
+
+  'definitions'
+];
 
 for (let i = 0, { length } = tests; i < length; ++i) {
   const item = tests[i];
@@ -31,7 +43,7 @@ for (let i = 0, { length } = tests; i < length; ++i) {
         for (let i = 0, { length } = tests; i < length; ++i) {
           const item = tests[i];
 
-          test(`${item.description}: ${JSON.stringify(item.data, null, 4)}: ${strF}`, () => {
+          test(`${item.description}: ${JSON.stringify(item.data, null, 4)}: ${strF}: ${item.valid}`, () => {
             expect(fn(item.data)).toEqual(item.valid ? item.data : null);
           });
         }

@@ -71,14 +71,6 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
             ctx.conditions[arrayIdx].push(`new Set(${identifier}).size===${identifier}.length`);
     },
 
-    prefixItems: (ctx, parentSchema, identifier) => {
-        const { root } = ctx;
-        const { prefixItems } = parentSchema;
-        const arrayConditions = ctx.conditions[arrayIdx];
-
-        for (let i = 0, { length } = prefixItems!; i < length; ++i) arrayConditions.push(root.compileConditions(prefixItems![i], `${identifier}[${i}]`));
-    },
-
     items: (ctx, parentSchema, identifier) => {
         const { items } = parentSchema;
         const { root } = ctx;
@@ -86,20 +78,22 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
 
         if (Array.isArray(items))
             for (let i = 0, { length } = items; i < length; ++i) arrayConditions.push(root.compileConditions((items as Schema[])[i], `${identifier}[${i}]`));
-        else {
-            arrayConditions.push('prefixItems' in parentSchema
-                ? `${root.addFunc(`(x)=>{for(let i=${(parentSchema.prefixItems as any[]).length},{length}=x;i<length;++i)if(!(${root.compileConditions(items as Schema, `${identifier}[i]`)}))return false;return true;}`)}(${identifier})`
-                : `${identifier}.every((x)=>${root.compileConditions(items as Schema, 'x')})`);
-        }
+        else
+            arrayConditions.push(`${identifier}.every((x)=>${root.compileConditions(items as Schema, 'x')})`);
     },
 
     additionalItems: (ctx, parentSchema, identifier) => {
         const { root } = ctx;
         const { additionalItems } = parentSchema;
 
-        ctx.conditions[arrayIdx].push(Array.isArray(parentSchema.items)
-            ? `${root.addFunc(`(x)=>{for(let i=${parentSchema.items.length},{length}=x;i<length;++i)if(!(${root.compileConditions(additionalItems!, `${identifier}[i]`)}))return false;return true;}`)}(${identifier})`
-            : `${identifier}.every((x)=>${root.compileConditions(additionalItems!, 'x')})`);
+        if (additionalItems === false) {
+            if (Array.isArray(parentSchema.items))
+                ctx.conditions[arrayIdx].push(`${identifier}.length<${parentSchema.items.length + 1}`);
+        } else {
+            ctx.conditions[arrayIdx].push(Array.isArray(parentSchema.items)
+                ? `${root.addFunc(`(x)=>{for(let i=${parentSchema.items.length},{length}=x;i<length;++i)if(!(${root.compileConditions(additionalItems!, `${identifier}[i]`)}))return false;return true;}`)}(${identifier})`
+                : `${identifier}.every((x)=>${root.compileConditions(additionalItems!, 'x')})`);
+        }
     },
 
     // Array contains
@@ -154,20 +148,24 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     },
 
     required: (ctx, parentSchema, identifier) => {
-        if (!('properties' in parentSchema)) {
-            const objectConditions = ctx.conditions[objectIdx];
+        const { properties = {} } = parentSchema;
+        const objectConditions = ctx.conditions[objectIdx];
 
-            const { required } = parentSchema;
-            for (let i = 0, { length } = required!; i < length; ++i) objectConditions.push(`${accessor(identifier, required![i])}`);
+        const { required } = parentSchema;
+        for (let i = 0, { length } = required!; i < length; ++i) {
+            const key = required![i];
+            if (!(key in properties))
+                objectConditions.push(`${accessor(identifier, key)}!==undefined`);
         }
     },
 
     dependentRequired: (ctx, parentSchema, identifier) => {
-        if (!('properties' in parentSchema)) {
-            const objectConditions = ctx.conditions[objectIdx];
+        const { properties = {} } = parentSchema;
+        const objectConditions = ctx.conditions[objectIdx];
 
-            const { dependentRequired } = parentSchema;
-            for (const key in dependentRequired!) {
+        const { dependentRequired } = parentSchema;
+        for (const key in dependentRequired!) {
+            if (!(key in properties)) {
                 const conditions = [];
 
                 const dependencies = dependentRequired[key];
@@ -179,13 +177,31 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
     },
 
     dependentSchemas: (ctx, parentSchema, identifier) => {
-        if (!('properties' in parentSchema)) {
-            const { root } = ctx;
-            const objectConditions = ctx.conditions[objectIdx];
+        const { properties = {} } = parentSchema;
 
-            const { dependentSchemas } = parentSchema;
-            for (const key in dependentSchemas!) objectConditions.push(`(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
+        const { root } = ctx;
+        const objectConditions = ctx.conditions[objectIdx];
+
+        const { dependentSchemas } = parentSchema;
+        for (const key in dependentSchemas!) {
+            if (!(key in properties))
+                objectConditions.push(`(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
         }
+    },
+
+    additionalProperties: (ctx, parentSchema, identifier) => {
+        const { root } = ctx;
+        const { additionalProperties, patternProperties, properties } = parentSchema;
+
+        const conditions = [];
+
+        if (properties !== undefined) conditions.push(`${root.addDeclaration(Object.keys(properties))}.includes(k)`);
+        if (patternProperties !== undefined)
+            for (const regex in patternProperties) conditions.push(`${new RegExp(regex).toString()}.test(k)`);
+
+        if (additionalProperties !== false)
+            conditions.push(root.compileConditions(additionalProperties!, `${identifier}[k]`));
+        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${conditions.join('||')})`);
     },
 
     // Independent object keywords

@@ -154,8 +154,11 @@ export class Context {
                 : this.root.options.noArrayObject
                     ? `(${identifier}===null||typeof ${identifier}!=='object'||Array.isArray(${identifier})||${conditions[objectIdx].join('&&')})`
                     : `(${identifier}===null||typeof ${identifier}!=='object'||${conditions[objectIdx].join('&&')})`);
-        } else if ((typeSet & objectCode) === objectCode)
-            finalConditions.push(`typeof ${identifier}==='object'&&${identifier}!==null`);
+        } else if ((typeSet & objectCode) === objectCode) {
+            finalConditions.push(this.root.options.noArrayObject
+                ? `typeof ${identifier}==='object'&&${identifier}!==null&&!Array.isArray(${identifier})`
+                : `typeof ${identifier}==='object'&&${identifier}!==null`);
+        }
 
         if ((typeSet & boolCode) === boolCode)
             finalConditions.push(`typeof ${identifier}==='boolean'`);
