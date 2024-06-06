@@ -119,11 +119,12 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
         const { root } = ctx;
         const { minContains, maxContains, contains } = parentSchema;
 
-        if (typeof minContains === 'number' || typeof maxContains === 'number')
-            ctx.conditions[arrayIdx].push(`${root.addFunc(`(x)=>{let c=0;for(let i=0,{length}=x;i<length;++i)c+=${root.compileConditions(contains!, 'x[i]')};return c>${typeof minContains === 'number' ? minContains - 1 : 0}${typeof maxContains === 'number' ? `&&c<${maxContains + 1}` : ''};}`)}(${identifier})`);
+        ctx.conditions[arrayIdx].push(typeof minContains === 'number' || typeof maxContains === 'number'
+            ? `${root.addFunc(`(x)=>{let c=0;for(let i=0,{length}=x;i<length;++i)c+=${root.compileConditions(contains!, 'x[i]')};return c>${typeof minContains === 'number' ? minContains - 1 : 0}${typeof maxContains === 'number' ? `&&c<${maxContains + 1}` : ''};}`)}(${identifier})`
+            : `${identifier}.some((x)=>${root.compileConditions(contains!, 'x')})`);
     },
 
-    // Objects
+    // Dependent object keywords
     properties: (ctx, parentSchema, identifier) => {
         const {
             properties = {},
@@ -152,6 +153,42 @@ const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boole
         }
     },
 
+    required: (ctx, parentSchema, identifier) => {
+        if (!('properties' in parentSchema)) {
+            const objectConditions = ctx.conditions[objectIdx];
+
+            const { required } = parentSchema;
+            for (let i = 0, { length } = required!; i < length; ++i) objectConditions.push(`${accessor(identifier, required![i])}`);
+        }
+    },
+
+    dependentRequired: (ctx, parentSchema, identifier) => {
+        if (!('properties' in parentSchema)) {
+            const objectConditions = ctx.conditions[objectIdx];
+
+            const { dependentRequired } = parentSchema;
+            for (const key in dependentRequired!) {
+                const conditions = [];
+
+                const dependencies = dependentRequired[key];
+                for (let i = 0, { length } = dependencies; i < length; ++i) conditions.push(`${accessor(identifier, dependencies[i])}!==undefined`);
+
+                objectConditions.push(`(${accessor(identifier, key)}===undefined||${conditions.join('&&')})`);
+            }
+        }
+    },
+
+    dependentSchemas: (ctx, parentSchema, identifier) => {
+        if (!('properties' in parentSchema)) {
+            const { root } = ctx;
+            const objectConditions = ctx.conditions[objectIdx];
+
+            const { dependentSchemas } = parentSchema;
+            for (const key in dependentSchemas!) objectConditions.push(`(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
+        }
+    },
+
+    // Independent object keywords
     patternProperties: (ctx, parentSchema, identifier) => {
         const { root } = ctx;
         const { patternProperties } = parentSchema;

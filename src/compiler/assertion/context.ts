@@ -5,6 +5,7 @@ import type { Schema } from '../../types/schema';
 export interface Options {
     allowNaN?: boolean;
     strictStringWidth?: boolean;
+    noArrayObject?: boolean;
 }
 
 export class RootContext {
@@ -23,6 +24,7 @@ export class RootContext {
 
         options.allowNaN ??= false;
         options.strictStringWidth ??= false;
+        options.noArrayObject ??= false;
         // @ts-expect-error Unset properties have been handled previously
         this.options = options;
     }
@@ -146,8 +148,12 @@ export class Context {
 
         if (conditions[objectIdx].length !== 0) {
             finalConditions.push((typeSet & objectCode) === objectCode
-                ? `(typeof ${identifier}==='object'&&${identifier}!==null&&${conditions[objectIdx].join('&&')})`
-                : `(${identifier}===null||typeof ${identifier}!=='object'||${conditions[objectIdx].join('&&')})`);
+                ? this.root.options.noArrayObject
+                    ? `(typeof ${identifier}==='object'&&${identifier}!==null&&!Array.isArray(${identifier})&&${conditions[objectIdx].join('&&')})`
+                    : `(typeof ${identifier}==='object'&&${identifier}!==null&&${conditions[objectIdx].join('&&')})`
+                : this.root.options.noArrayObject
+                    ? `(${identifier}===null||typeof ${identifier}!=='object'||Array.isArray(${identifier})||${conditions[objectIdx].join('&&')})`
+                    : `(${identifier}===null||typeof ${identifier}!=='object'||${conditions[objectIdx].join('&&')})`);
         } else if ((typeSet & objectCode) === objectCode)
             finalConditions.push(`typeof ${identifier}==='object'&&${identifier}!==null`);
 
