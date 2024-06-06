@@ -1,4 +1,4 @@
-import { arrayCode, boolCode, intCode, noTypeIdx, nullCode, numberCode, objectCode, stringCode, stringIdx, numberIdx, arrayIdx, objectIdx, typeCount, createConditionArray } from './keywords/utils';
+import { arrayCode, boolCode, intCode, noTypeIdx, nullCode, numberCode, objectCode, stringCode, stringIdx, numberIdx, arrayIdx, objectIdx, createConditionArray } from './keywords/utils';
 import mapping from './keywords/mapping';
 import type { Schema } from '../../types/schema';
 
@@ -16,10 +16,14 @@ export class RootContext {
     /**
      * Compiler options
      */
-    public readonly options: Options;
+    public readonly options: Required<Options>;
 
     public constructor(options: Options) {
         this.declarations = [];
+
+        options.allowNaN ??= false;
+        options.strictStringWidth ??= false;
+        // @ts-expect-error Unset properties have been handled previously
         this.options = options;
     }
 
