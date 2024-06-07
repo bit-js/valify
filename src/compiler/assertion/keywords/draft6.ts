@@ -1,10 +1,8 @@
 /* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import type { Schema } from '../../../types/schema';
-import type { Context } from '../context';
+import { accessor, arrayIdx, noTypeIdx, numberIdx, objectIdx, stringIdx, type KeywordMapping } from './utils';
 
-import { accessor, arrayIdx, noTypeIdx, numberIdx, objectIdx, stringIdx } from './utils';
-
-const mapping: Record<string, (ctx: Context, parentSchema: Exclude<Schema, boolean>, identifier: string) => void> = {
+const mapping: KeywordMapping = {
     // Generic keywords
     type: (ctx, { type }) => {
         if (typeof type === 'string') ctx.addType(type);

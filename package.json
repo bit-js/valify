@@ -17,9 +17,8 @@
     "lint:fix": "eslint ./src --fix"
   },
   "devDependencies": {
-    "@json-schema-org/tests": "^2.0.0",
     "@stylistic/eslint-plugin": "latest",
-    "@types/bun": "latest",
+    "@types/bun": "^1.1.3",
     "eslint": "latest",
     "eslint-plugin-jsdoc": "latest",
     "mitata": "latest",

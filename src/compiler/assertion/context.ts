@@ -1,9 +1,8 @@
-import { arrayCode, boolCode, intCode, noTypeIdx, nullCode, numberCode, objectCode, stringCode, stringIdx, numberIdx, arrayIdx, objectIdx, createConditionArray } from './keywords/utils';
-import mapping from './keywords/mapping';
+import { arrayCode, boolCode, intCode, noTypeIdx, nullCode, numberCode, objectCode, stringCode, stringIdx, numberIdx, arrayIdx, objectIdx, createConditionArray, type KeywordMapping } from './keywords/utils';
 import type { Schema } from '../../types/schema';
 
 export interface Options {
-    allowNaN?: boolean;
+    noNonFiniteNumber?: boolean;
     strictStringWidth?: boolean;
     noArrayObject?: boolean;
     accurateMultipleOf?: boolean;
@@ -21,14 +20,21 @@ export class RootContext {
      */
     public readonly options: Required<Options>;
 
-    public constructor(options: Options) {
+    /**
+     * Keywords mappings
+     */
+    public readonly keywords: KeywordMapping;
+
+    public constructor(options: Options, keywords: KeywordMapping) {
+        this.keywords = keywords;
         this.declarations = [];
 
-        options.allowNaN ??= false;
+        options.noNonFiniteNumber ??= false;
         options.strictStringWidth ??= false;
         options.noArrayObject ??= false;
         options.accurateMultipleOf ??= false;
         options.unicodeAwareRegex ??= false;
+
         // @ts-expect-error Unset properties have been handled previously
         this.options = options;
     }
@@ -55,9 +61,11 @@ export class RootContext {
         if (schema === false) return `${identifier}===undefined`;
         if (schema === true) return `${identifier}!==undefined`;
 
+        const { keywords } = this;
+
         const ctx = new Context(this);
         // eslint-disable-next-line
-        for (const key in schema) mapping[key]?.(ctx, schema, identifier);
+        for (const key in schema) keywords[key]?.(ctx, schema, identifier);
 
         return ctx.finalize(identifier);
     }
@@ -134,19 +142,19 @@ export class Context {
 
         if (conditions[numberIdx].length !== 0) {
             finalConditions.push((typeSet & numberCode) === numberCode
-                ? this.root.options.allowNaN
-                    ? `(typeof ${identifier}==='number'&&${conditions[numberIdx].join('&&')})`
-                    : `(Number.isFinite(${identifier})&&${conditions[numberIdx].join('&&')})`
+                ? this.root.options.noNonFiniteNumber
+                    ? `(Number.isFinite(${identifier})&&${conditions[numberIdx].join('&&')})`
+                    : `(typeof ${identifier}==='number'&&${conditions[numberIdx].join('&&')})`
 
                 : (typeSet & intCode) === intCode
                     ? `(Number.isInteger(${identifier})&&${conditions[numberIdx].join('&&')})`
-                    : this.root.options.allowNaN
-                        ? `(typeof ${identifier}!=='number'||${conditions[numberIdx].join('&&')})`
-                        : `(!Number.isFinite(${identifier})||${conditions[numberIdx].join('&&')})`);
+                    : this.root.options.noNonFiniteNumber
+                        ? `(!Number.isFinite(${identifier})||${conditions[numberIdx].join('&&')})`
+                        : `(typeof ${identifier}!=='number'||${conditions[numberIdx].join('&&')})`);
         } else if ((typeSet & numberCode) === numberCode) {
-            finalConditions.push(this.root.options.allowNaN
-                ? `typeof ${identifier}==='number'`
-                : `Number.isFinite(${identifier})`);
+            finalConditions.push(this.root.options.noNonFiniteNumber
+                ? `Number.isFinite(${identifier})`
+                : `typeof ${identifier}==='number'`);
         } else if ((typeSet & intCode) === intCode)
             finalConditions.push(`Number.isInteger(${identifier})`);
 
@@ -171,6 +179,6 @@ export class Context {
 
         return conditions[noTypeIdx].length === 0
             ? finalConditions.length === 0 ? `${identifier}!==undefined` : finalConditions.join('||')
-            : `(${finalConditions.join('||')})&&${conditions[noTypeIdx].join('&&')}`;
+            : finalConditions.length === 0 ? conditions[noTypeIdx].join('&&') : `(${finalConditions.join('||')})&&${conditions[noTypeIdx].join('&&')}`;
     }
 }

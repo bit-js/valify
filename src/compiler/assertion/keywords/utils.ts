@@ -1,3 +1,8 @@
+import type { Schema } from '../../../types/schema';
+import type { Context } from '../context';
+
+export type KeywordMapping = Record<string, (ctx: Context, parentSchema: Exclude<Schema, boolean>, identifier: string) => void>;
+
 export const noTypeIdx = 0;
 
 export const stringIdx = 1;
