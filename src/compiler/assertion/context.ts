@@ -1,4 +1,4 @@
-import { arrayCode, boolCode, intCode, noTypeIdx, nullCode, numberCode, objectCode, stringCode, stringIdx, numberIdx, arrayIdx, objectIdx, createConditionArray, type KeywordMapping } from './keywords/utils';
+import { arrayCode, boolCode, intCode, nullCode, numberCode, objectCode, stringCode, type KeywordMapping } from './keywords/utils';
 import type { Schema } from '../../types/schema';
 
 export interface Options {
@@ -77,14 +77,23 @@ export class Context {
     public readonly root: RootContext;
 
     // Stores the attached conditions of different types
-    public readonly conditions: string[][];
+    public readonly stringConditions: string[];
+    public readonly numberConditions: string[];
+    public readonly arrayConditions: string[];
+    public readonly objectConditions: string[];
+    public readonly otherConditions: string[];
 
     // Track whether a type has been specified
     private typeSet: number;
 
     public constructor(root: RootContext) {
         this.root = root;
-        this.conditions = createConditionArray();
+
+        this.stringConditions = [];
+        this.numberConditions = [];
+        this.arrayConditions = [];
+        this.objectConditions = [];
+        this.otherConditions = [];
         this.typeSet = 0;
     }
 
@@ -126,33 +135,33 @@ export class Context {
 
     public finalize(identifier: string): string {
         const finalConditions = [];
-        const { typeSet, conditions } = this;
+        const { typeSet } = this;
 
-        if (conditions[stringIdx].length !== 0) {
+        if (this.stringConditions.length !== 0) {
             finalConditions.push((typeSet & stringCode) === stringCode
-                ? `(typeof ${identifier}==='string'&&${conditions[stringIdx].join('&&')})`
-                : `(typeof ${identifier}!=='string'||${conditions[stringIdx].join('&&')})`);
+                ? `(typeof ${identifier}==='string'&&${this.stringConditions.join('&&')})`
+                : `(typeof ${identifier}!=='string'||${this.stringConditions.join('&&')})`);
         } else if ((typeSet & stringCode) === stringCode)
             finalConditions.push(`typeof ${identifier}==='string'`);
 
-        if (conditions[arrayIdx].length !== 0) {
+        if (this.arrayConditions.length !== 0) {
             finalConditions.push((typeSet & arrayCode) === arrayCode
-                ? `(Array.isArray(${identifier})&&${conditions[arrayIdx].join('&&')})`
-                : `(!Array.isArray(${identifier})||${conditions[arrayIdx].join('&&')})`);
+                ? `(Array.isArray(${identifier})&&${this.arrayConditions.join('&&')})`
+                : `(!Array.isArray(${identifier})||${this.arrayConditions.join('&&')})`);
         } else if ((typeSet & arrayCode) === arrayCode)
             finalConditions.push(`Array.isArray(${identifier})`);
 
-        if (conditions[numberIdx].length !== 0) {
+        if (this.numberConditions.length !== 0) {
             finalConditions.push((typeSet & numberCode) === numberCode
                 ? this.root.options.noNonFiniteNumber
-                    ? `(Number.isFinite(${identifier})&&${conditions[numberIdx].join('&&')})`
-                    : `(typeof ${identifier}==='number'&&${conditions[numberIdx].join('&&')})`
+                    ? `(Number.isFinite(${identifier})&&${this.numberConditions.join('&&')})`
+                    : `(typeof ${identifier}==='number'&&${this.numberConditions.join('&&')})`
 
                 : (typeSet & intCode) === intCode
-                    ? `(Number.isInteger(${identifier})&&${conditions[numberIdx].join('&&')})`
+                    ? `(Number.isInteger(${identifier})&&${this.numberConditions.join('&&')})`
                     : this.root.options.noNonFiniteNumber
-                        ? `(!Number.isFinite(${identifier})||${conditions[numberIdx].join('&&')})`
-                        : `(typeof ${identifier}!=='number'||${conditions[numberIdx].join('&&')})`);
+                        ? `(!Number.isFinite(${identifier})||${this.numberConditions.join('&&')})`
+                        : `(typeof ${identifier}!=='number'||${this.numberConditions.join('&&')})`);
         } else if ((typeSet & numberCode) === numberCode) {
             finalConditions.push(this.root.options.noNonFiniteNumber
                 ? `Number.isFinite(${identifier})`
@@ -160,14 +169,14 @@ export class Context {
         } else if ((typeSet & intCode) === intCode)
             finalConditions.push(`Number.isInteger(${identifier})`);
 
-        if (conditions[objectIdx].length !== 0) {
+        if (this.objectConditions.length !== 0) {
             finalConditions.push((typeSet & objectCode) === objectCode
                 ? this.root.options.noArrayObject
-                    ? `(typeof ${identifier}==='object'&&${identifier}!==null&&!Array.isArray(${identifier})&&${conditions[objectIdx].join('&&')})`
-                    : `(typeof ${identifier}==='object'&&${identifier}!==null&&${conditions[objectIdx].join('&&')})`
+                    ? `(typeof ${identifier}==='object'&&${identifier}!==null&&!Array.isArray(${identifier})&&${this.objectConditions.join('&&')})`
+                    : `(typeof ${identifier}==='object'&&${identifier}!==null&&${this.objectConditions.join('&&')})`
                 : this.root.options.noArrayObject
-                    ? `(${identifier}===null||typeof ${identifier}!=='object'||Array.isArray(${identifier})||${conditions[objectIdx].join('&&')})`
-                    : `(${identifier}===null||typeof ${identifier}!=='object'||${conditions[objectIdx].join('&&')})`);
+                    ? `(${identifier}===null||typeof ${identifier}!=='object'||Array.isArray(${identifier})||${this.objectConditions.join('&&')})`
+                    : `(${identifier}===null||typeof ${identifier}!=='object'||${this.objectConditions.join('&&')})`);
         } else if ((typeSet & objectCode) === objectCode) {
             finalConditions.push(this.root.options.noArrayObject
                 ? `typeof ${identifier}==='object'&&${identifier}!==null&&!Array.isArray(${identifier})`
@@ -179,9 +188,9 @@ export class Context {
         if ((typeSet & nullCode) === nullCode)
             finalConditions.push(`${identifier}===null`);
 
-        return conditions[noTypeIdx].length === 0
+        return this.otherConditions.length === 0
             ? finalConditions.length === 0 ? `${identifier}!==undefined` : finalConditions.join('||')
-            : finalConditions.length === 0 ? conditions[noTypeIdx].join('&&') : `(${finalConditions.join('||')})&&${conditions[noTypeIdx].join('&&')}`;
+            : finalConditions.length === 0 ? this.otherConditions.join('&&') : `(${finalConditions.join('||')})&&${this.otherConditions.join('&&')}`;
     }
 }
 

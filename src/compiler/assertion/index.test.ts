@@ -10,7 +10,7 @@ const ignoredSuites = [
   // eslint-disable-next-line
   'format',
   // eslint-disable-next-line
-  'oneOf', 'anyOf', 'allOf', 'not', 'if-then-else',
+  'oneOf', 'anyOf', 'allOf',
   // eslint-disable-next-line
   'definitions', 'default', 'dependencies',
   // eslint-disable-next-line

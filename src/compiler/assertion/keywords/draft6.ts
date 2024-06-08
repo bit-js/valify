@@ -1,6 +1,6 @@
 /* eslint-disable  @typescript-eslint/no-non-null-assertion */
 import type { Schema } from '../../../types/schema';
-import { accessor, arrayIdx, noTypeIdx, numberIdx, objectIdx, stringIdx, type KeywordMapping } from './utils';
+import { accessor, type KeywordMapping } from './utils';
 
 const mapping: KeywordMapping = {
     // Generic keywords
@@ -10,69 +10,74 @@ const mapping: KeywordMapping = {
     },
 
     enum: (ctx, parentSchema, identifier) => {
-        ctx.conditions[noTypeIdx].push(`${ctx.root.addDeclaration(parentSchema.enum)}.includes(${identifier})`);
+        ctx.otherConditions.push(`${ctx.root.addDeclaration(parentSchema.enum)}.includes(${identifier})`);
     },
 
     const: (ctx, parentSchema, identifier) => {
-        ctx.conditions[noTypeIdx].push(`${identifier}===${JSON.stringify(parentSchema.const)}`);
+        ctx.otherConditions.push(`${identifier}===${JSON.stringify(parentSchema.const)}`);
+    },
+
+    // Conditional keywords
+    not: (ctx, parentSchema, identifier) => {
+        ctx.otherConditions.push(`!(${ctx.root.compileConditions(parentSchema.not!, identifier)})`);
     },
 
     // String
     minLength: (ctx, parentSchema, identifier) => {
-        ctx.conditions[stringIdx].push(ctx.root.options.strictStringWidth
+        ctx.stringConditions.push(ctx.root.options.strictStringWidth
             ? `[...${identifier}].length>${parentSchema.minLength! - 1}`
             : `${identifier}.length>${parentSchema.minLength! - 1}`);
     },
 
     maxLength: (ctx, parentSchema, identifier) => {
-        ctx.conditions[stringIdx].push(ctx.root.options.strictStringWidth
+        ctx.stringConditions.push(ctx.root.options.strictStringWidth
             ? `[...${identifier}].length<${parentSchema.maxLength! + 1}`
             : `${identifier}.length<${parentSchema.maxLength! + 1}`);
     },
 
     pattern: (ctx, parentSchema, identifier) => {
-        ctx.conditions[stringIdx].push(`${(ctx.root.options.unicodeAwareRegex ? new RegExp(parentSchema.pattern!, 'u') : new RegExp(parentSchema.pattern!)).toString()}.test(${identifier})`);
+        ctx.stringConditions.push(`${(ctx.root.options.unicodeAwareRegex ? new RegExp(parentSchema.pattern!, 'u') : new RegExp(parentSchema.pattern!)).toString()}.test(${identifier})`);
     },
 
     // Number
     multipleOf: (ctx, parentSchema, identifier) => {
-        ctx.conditions[numberIdx].push(ctx.root.options.accurateMultipleOf ? `${identifier}/${parentSchema.multipleOf}%1===0` : `${identifier}%${parentSchema.multipleOf}===0`);
+        ctx.numberConditions.push(ctx.root.options.accurateMultipleOf ? `${identifier}/${parentSchema.multipleOf}%1===0` : `${identifier}%${parentSchema.multipleOf}===0`);
     },
 
     minimum: (ctx, parentSchema, identifier) => {
-        ctx.conditions[numberIdx].push(`${identifier}>=${parentSchema.minimum}`);
+        ctx.numberConditions.push(`${identifier}>=${parentSchema.minimum}`);
     },
 
     maximum: (ctx, parentSchema, identifier) => {
-        ctx.conditions[numberIdx].push(`${identifier}<=${parentSchema.maximum}`);
+        ctx.numberConditions.push(`${identifier}<=${parentSchema.maximum}`);
     },
 
     exclusiveMinimum: (ctx, parentSchema, identifier) => {
-        ctx.conditions[numberIdx].push(`${identifier}>${parentSchema.exclusiveMinimum}`);
+        ctx.numberConditions.push(`${identifier}>${parentSchema.exclusiveMinimum}`);
     },
 
     exclusiveMaximum: (ctx, parentSchema, identifier) => {
-        ctx.conditions[numberIdx].push(`${identifier}<${parentSchema.exclusiveMaximum}`);
+        ctx.numberConditions.push(`${identifier}<${parentSchema.exclusiveMaximum}`);
     },
 
     // Arrays
     minItems: (ctx, parentSchema, identifier) => {
-        ctx.conditions[arrayIdx].push(`${identifier}.length>${parentSchema.minItems! - 1}`);
+        ctx.arrayConditions.push(`${identifier}.length>${parentSchema.minItems! - 1}`);
     },
 
     maxItems: (ctx, parentSchema, identifier) => {
-        ctx.conditions[arrayIdx].push(`${identifier}.length<${parentSchema.maxItems! + 1}`);
+        ctx.arrayConditions.push(`${identifier}.length<${parentSchema.maxItems! + 1}`);
     },
 
     uniqueItems: (ctx, parentSchema, identifier) => {
         if (parentSchema.uniqueItems === true)
-            ctx.conditions[arrayIdx].push(`new Set(${identifier}).size===${identifier}.length`);
+            ctx.arrayConditions.push(`new Set(${identifier}).size===${identifier}.length`);
     },
 
     items: (ctx, parentSchema, identifier) => {
         const { items } = parentSchema;
         const { root } = ctx;
-        const arrayConditions = ctx.conditions[arrayIdx];
+        const { arrayConditions } = ctx;
 
         if (Array.isArray(items))
             for (let i = 0, { length } = items; i < length; ++i) arrayConditions.push(`${identifier}.length===${i}||${root.compileConditions((items as Schema[])[i], `${identifier}[${i}]`)}`);
@@ -89,9 +94,9 @@ const mapping: KeywordMapping = {
 
             if (additionalItems === false) {
                 if (Array.isArray(items))
-                    ctx.conditions[arrayIdx].push(`${identifier}.length===${items.length}`);
+                    ctx.arrayConditions.push(`${identifier}.length===${items.length}`);
             } else {
-                ctx.conditions[arrayIdx].push(Array.isArray(items)
+                ctx.arrayConditions.push(Array.isArray(items)
                     ? `${root.addFunc(`(x)=>{for(let i=${items.length},{length}=x;i<length;++i)if(!(${root.compileConditions(additionalItems!, `${identifier}[i]`)}))return false;return true;}`)}(${identifier})`
                     : `${identifier}.every((x)=>${root.compileConditions(additionalItems!, 'x')})`);
             }
@@ -102,20 +107,20 @@ const mapping: KeywordMapping = {
     minContains: (ctx, parentSchema, identifier) => {
         // Other case is handled by contains
         if (!('contains' in parentSchema))
-            ctx.conditions[arrayIdx].push(`${identifier}.length>${parentSchema.minContains! - 1}`);
+            ctx.arrayConditions.push(`${identifier}.length>${parentSchema.minContains! - 1}`);
     },
 
     maxContains: (ctx, parentSchema, identifier) => {
         // Other case is handled by contains
         if (!('contains' in parentSchema))
-            ctx.conditions[arrayIdx].push(`${identifier}.length<${parentSchema.maxContains! + 1}`);
+            ctx.arrayConditions.push(`${identifier}.length<${parentSchema.maxContains! + 1}`);
     },
 
     contains: (ctx, parentSchema, identifier) => {
         const { root } = ctx;
         const { minContains, maxContains, contains } = parentSchema;
 
-        ctx.conditions[arrayIdx].push(typeof minContains === 'number' || typeof maxContains === 'number'
+        ctx.arrayConditions.push(typeof minContains === 'number' || typeof maxContains === 'number'
             ? `${root.addFunc(`(x)=>{let c=0;for(let i=0,{length}=x;i<length;++i)c+=${root.compileConditions(contains!, 'x[i]')};return c>${typeof minContains === 'number' ? minContains - 1 : 0}${typeof maxContains === 'number' ? `&&c<${maxContains + 1}` : ''};}`)}(${identifier})`
             : `${identifier}.some((x)=>${root.compileConditions(contains!, 'x')})`);
     },
@@ -127,8 +132,7 @@ const mapping: KeywordMapping = {
             required = []
         } = parentSchema;
 
-        const { root } = ctx;
-        const objectConditions = ctx.conditions[objectIdx];
+        const { root, objectConditions } = ctx;
         const { strictPropertyCheck } = ctx.root.options;
 
         for (const key in properties) {
@@ -146,7 +150,7 @@ const mapping: KeywordMapping = {
 
     required: (ctx, parentSchema, identifier) => {
         const { properties = {} } = parentSchema;
-        const objectConditions = ctx.conditions[objectIdx];
+        const { objectConditions } = ctx;
         const { strictPropertyCheck } = ctx.root.options;
 
         const { required } = parentSchema;
@@ -158,36 +162,6 @@ const mapping: KeywordMapping = {
     },
 
     // Independent object keywords
-    dependentRequired: (ctx, parentSchema, identifier) => {
-        const objectConditions = ctx.conditions[objectIdx];
-        const { strictPropertyCheck } = ctx.root.options;
-
-        const { dependentRequired } = parentSchema;
-        for (const key in dependentRequired!) {
-            const conditions = [];
-
-            const dependencies = dependentRequired[key];
-            for (let i = 0, { length } = dependencies; i < length; ++i) conditions.push(`${accessor(identifier, dependencies[i])}!==undefined`);
-
-            objectConditions.push(strictPropertyCheck
-                ? `(!Object.hasOwn(${identifier},${JSON.stringify(key)})||${conditions.join('&&')})`
-                : `(${accessor(identifier, key)}===undefined||${conditions.join('&&')})`);
-        }
-    },
-
-    dependentSchemas: (ctx, parentSchema, identifier) => {
-        const { root } = ctx;
-        const objectConditions = ctx.conditions[objectIdx];
-        const { strictPropertyCheck } = ctx.root.options;
-
-        const { dependentSchemas } = parentSchema;
-        for (const key in dependentSchemas!) {
-            objectConditions.push(strictPropertyCheck
-                ? `(!Object.hasOwn(${identifier},${JSON.stringify(key)})||${root.compileConditions(dependentSchemas[key], identifier)})`
-                : `(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
-        }
-    },
-
     additionalProperties: (ctx, parentSchema, identifier) => {
         const { root } = ctx;
         const { additionalProperties, patternProperties, properties } = parentSchema;
@@ -200,7 +174,8 @@ const mapping: KeywordMapping = {
 
         if (additionalProperties !== false)
             conditions.push(root.compileConditions(additionalProperties!, `${identifier}[k]`));
-        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${conditions.join('||')})`);
+
+        ctx.objectConditions.push(`Object.keys(${identifier}).every((k)=>${conditions.join('||')})`);
     },
 
     patternProperties: (ctx, parentSchema, identifier) => {
@@ -211,19 +186,19 @@ const mapping: KeywordMapping = {
         for (const key in patternProperties) conditions.push(`(!${(ctx.root.options.unicodeAwareRegex ? new RegExp(key, 'u') : new RegExp(key)).toString()}.test(k)||${root.compileConditions(patternProperties[key], `${identifier}[k]`)})`);
 
         if (conditions.length !== 0)
-            ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${conditions.join('&&')})`);
+            ctx.objectConditions.push(`Object.keys(${identifier}).every((k)=>${conditions.join('&&')})`);
     },
 
     propertyNames: (ctx, parentSchema, identifier) => {
-        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${ctx.root.compileConditions(parentSchema.propertyNames!, 'k')})`);
+        ctx.objectConditions.push(`Object.keys(${identifier}).every((k)=>${ctx.root.compileConditions(parentSchema.propertyNames!, 'k')})`);
     },
 
     minProperties: (ctx, parentSchema, identifier) => {
-        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).length>${parentSchema.minProperties! - 1}`);
+        ctx.objectConditions.push(`Object.keys(${identifier}).length>${parentSchema.minProperties! - 1}`);
     },
 
     maxProperties: (ctx, parentSchema, identifier) => {
-        ctx.conditions[objectIdx].push(`Object.keys(${identifier}).length<${parentSchema.maxProperties! + 1}`);
+        ctx.objectConditions.push(`Object.keys(${identifier}).length<${parentSchema.maxProperties! + 1}`);
     }
 };
 

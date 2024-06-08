@@ -3,9 +3,6 @@ import type { ExtendedJSONSchema, FromExtendedSchema } from 'json-schema-to-ts';
 interface SchemaExtension extends Record<string, unknown> {
     minContains: number;
     maxContains: number;
-
-    dependentRequired: Record<string, string[]>;
-    dependentSchemas: Record<string, Schema>;
 }
 
 export type Schema = ExtendedJSONSchema<SchemaExtension>;
