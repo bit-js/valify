@@ -4,6 +4,7 @@ import type { Schema } from '../../types/schema';
 export interface Options {
     noNonFiniteNumber?: boolean;
     strictStringWidth?: boolean;
+    strictPropertyCheck?: boolean;
     noArrayObject?: boolean;
     accurateMultipleOf?: boolean;
     unicodeAwareRegex?: boolean;
@@ -25,12 +26,13 @@ export class RootContext {
      */
     public readonly keywords: KeywordMapping;
 
-    public constructor(options: Options, keywords: KeywordMapping) {
-        this.keywords = keywords;
+    public constructor(options: Options, keywordMap: KeywordMapping) {
+        this.keywords = keywordMap;
         this.declarations = [];
 
         options.noNonFiniteNumber ??= false;
         options.strictStringWidth ??= false;
+        options.strictPropertyCheck ??= false;
         options.noArrayObject ??= false;
         options.accurateMultipleOf ??= false;
         options.unicodeAwareRegex ??= false;
@@ -182,3 +184,4 @@ export class Context {
             : finalConditions.length === 0 ? conditions[noTypeIdx].join('&&') : `(${finalConditions.join('||')})&&${conditions[noTypeIdx].join('&&')}`;
     }
 }
+

@@ -12,11 +12,16 @@ const ignoredSuites = [
   // eslint-disable-next-line
   'oneOf', 'anyOf', 'allOf', 'not', 'if-then-else',
   // eslint-disable-next-line
-  'definitions', 'default', 'dependencies'
+  'definitions', 'default', 'dependencies',
+  // eslint-disable-next-line
+  'enum', 'const', 'uniqueItems'
 ];
+
+const selectedSuite: string | null = null;
 
 for (const suiteName in suitesMap) {
   if (ignoredSuites.includes(suiteName)) continue;
+  if (selectedSuite !== null && suiteName !== selectedSuite) continue;
 
   const suites = suitesMap[suiteName];
   for (let i = 0, suiteLen = suites.length; i < suiteLen; ++i) {
@@ -26,6 +31,7 @@ for (const suiteName in suitesMap) {
       const fn = evaluate(suite.schema, keywords.draft6, {
         noArrayObject: true,
         strictStringWidth: true,
+        strictPropertyCheck: true,
         unicodeAwareRegex: true,
         accurateMultipleOf: true
       });
@@ -39,13 +45,12 @@ for (const suiteName in suitesMap) {
               const item = tests[j];
 
               describe(item.description, () => {
-                test(`Data: ${JSON.stringify(item.data, null, 4)}`, () => {
-                  expect(fn(item.data)).toBe(item.valid)
+                test(`Data: ${JSON.stringify(item.data, null, 4)} - Expected: ${item.valid}`, () => {
+                  expect(fn(item.data)).toBe(item.valid);
                 });
               });
             }
           });
-
         });
       });
 

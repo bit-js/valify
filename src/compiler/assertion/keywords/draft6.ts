@@ -14,7 +14,7 @@ const mapping: KeywordMapping = {
     },
 
     const: (ctx, parentSchema, identifier) => {
-        ctx.conditions[noTypeIdx].push(`${identifier}===${JSON.stringify(parentSchema.enum)}`);
+        ctx.conditions[noTypeIdx].push(`${identifier}===${JSON.stringify(parentSchema.const)}`);
     },
 
     // String
@@ -81,16 +81,20 @@ const mapping: KeywordMapping = {
     },
 
     additionalItems: (ctx, parentSchema, identifier) => {
-        const { root } = ctx;
-        const { additionalItems } = parentSchema;
+        const { items } = parentSchema;
 
-        if (additionalItems === false) {
-            if (Array.isArray(parentSchema.items))
-                ctx.conditions[arrayIdx].push(`${identifier}.length===${parentSchema.items.length}`);
-        } else {
-            ctx.conditions[arrayIdx].push(Array.isArray(parentSchema.items)
-                ? `${root.addFunc(`(x)=>{for(let i=${parentSchema.items.length},{length}=x;i<length;++i)if(!(${root.compileConditions(additionalItems!, `${identifier}[i]`)}))return false;return true;}`)}(${identifier})`
-                : `${identifier}.every((x)=>${root.compileConditions(additionalItems!, 'x')})`);
+        if (items === undefined || Array.isArray(items)) {
+            const { root } = ctx;
+            const { additionalItems } = parentSchema;
+
+            if (additionalItems === false) {
+                if (Array.isArray(items))
+                    ctx.conditions[arrayIdx].push(`${identifier}.length===${items.length}`);
+            } else {
+                ctx.conditions[arrayIdx].push(Array.isArray(items)
+                    ? `${root.addFunc(`(x)=>{for(let i=${items.length},{length}=x;i<length;++i)if(!(${root.compileConditions(additionalItems!, `${identifier}[i]`)}))return false;return true;}`)}(${identifier})`
+                    : `${identifier}.every((x)=>${root.compileConditions(additionalItems!, 'x')})`);
+            }
         }
     },
 
@@ -125,31 +129,38 @@ const mapping: KeywordMapping = {
 
         const { root } = ctx;
         const objectConditions = ctx.conditions[objectIdx];
+        const { strictPropertyCheck } = ctx.root.options;
 
         for (const key in properties) {
             const propIdentifier = accessor(identifier, key);
+
             const conditions = [root.compileConditions(properties[key], propIdentifier)];
 
             objectConditions.push(required.includes(key)
                 ? conditions.join('&&')
-                : `(${propIdentifier}===undefined||${conditions.join('&&')})`);
+                : strictPropertyCheck
+                    ? `(!Object.hasOwn(${identifier},${JSON.stringify(key)})||${conditions.join('&&')})`
+                    : `(${propIdentifier}===undefined||${conditions.join('&&')})`);
         }
     },
 
     required: (ctx, parentSchema, identifier) => {
         const { properties = {} } = parentSchema;
         const objectConditions = ctx.conditions[objectIdx];
+        const { strictPropertyCheck } = ctx.root.options;
 
         const { required } = parentSchema;
         for (let i = 0, { length } = required!; i < length; ++i) {
             const key = required![i];
-            if (!(key in properties))
-                objectConditions.push(`${accessor(identifier, key)}!==undefined`);
+            if (!Object.hasOwn(properties, key))
+                objectConditions.push(strictPropertyCheck ? `Object.hasOwn(${identifier},${JSON.stringify(key)})` : `${accessor(identifier, key)}!==undefined`);
         }
     },
 
+    // Independent object keywords
     dependentRequired: (ctx, parentSchema, identifier) => {
         const objectConditions = ctx.conditions[objectIdx];
+        const { strictPropertyCheck } = ctx.root.options;
 
         const { dependentRequired } = parentSchema;
         for (const key in dependentRequired!) {
@@ -158,16 +169,23 @@ const mapping: KeywordMapping = {
             const dependencies = dependentRequired[key];
             for (let i = 0, { length } = dependencies; i < length; ++i) conditions.push(`${accessor(identifier, dependencies[i])}!==undefined`);
 
-            objectConditions.push(`(${accessor(identifier, key)}===undefined||${conditions.join('&&')})`);
+            objectConditions.push(strictPropertyCheck
+                ? `(!Object.hasOwn(${identifier},${JSON.stringify(key)})||${conditions.join('&&')})`
+                : `(${accessor(identifier, key)}===undefined||${conditions.join('&&')})`);
         }
     },
 
     dependentSchemas: (ctx, parentSchema, identifier) => {
         const { root } = ctx;
         const objectConditions = ctx.conditions[objectIdx];
+        const { strictPropertyCheck } = ctx.root.options;
 
         const { dependentSchemas } = parentSchema;
-        for (const key in dependentSchemas!) objectConditions.push(`(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
+        for (const key in dependentSchemas!) {
+            objectConditions.push(strictPropertyCheck
+                ? `(!Object.hasOwn(${identifier},${JSON.stringify(key)})||${root.compileConditions(dependentSchemas[key], identifier)})`
+                : `(${accessor(identifier, key)}===undefined||${root.compileConditions(dependentSchemas[key], identifier)})`);
+        }
     },
 
     additionalProperties: (ctx, parentSchema, identifier) => {
@@ -185,7 +203,6 @@ const mapping: KeywordMapping = {
         ctx.conditions[objectIdx].push(`Object.keys(${identifier}).every((k)=>${conditions.join('||')})`);
     },
 
-    // Independent object keywords
     patternProperties: (ctx, parentSchema, identifier) => {
         const { root } = ctx;
         const { patternProperties } = parentSchema;
