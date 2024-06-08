@@ -22,6 +22,27 @@ const mapping: KeywordMapping = {
         ctx.otherConditions.push(`!(${ctx.root.compileConditions(parentSchema.not!, identifier)})`);
     },
 
+    allOf: (ctx, parentSchema, identifier) => {
+        const { allOf } = parentSchema;
+        for (let i = 0, { length } = allOf!; i < length; ++i) ctx.evaluate(allOf![i], identifier);
+    },
+
+    anyOf: (ctx, parentSchema, identifier) => {
+        ctx.otherConditions.push(`(${parentSchema.anyOf!.map((subschema) => {
+            const conditionContext = ctx.clone();
+            conditionContext.evaluate(subschema, identifier);
+            return conditionContext.finalize(identifier);
+        }).join(')||(')})`);
+    },
+
+    oneOf: (ctx, parentSchema, identifier) => {
+        ctx.otherConditions.push(`(${parentSchema.oneOf!.map((subschema) => {
+            const conditionContext = ctx.clone();
+            conditionContext.evaluate(subschema, identifier);
+            return conditionContext.finalize(identifier);
+        }).join('?1:0)+(')}?1:0)===1`);
+    },
+
     // String
     minLength: (ctx, parentSchema, identifier) => {
         ctx.stringConditions.push(ctx.root.options.strictStringWidth

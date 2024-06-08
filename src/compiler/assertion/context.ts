@@ -87,14 +87,31 @@ export class Context {
     private typeSet: number;
 
     public constructor(root: RootContext) {
-        this.root = root;
-
         this.stringConditions = [];
         this.numberConditions = [];
         this.arrayConditions = [];
         this.objectConditions = [];
         this.otherConditions = [];
+
+        this.root = root;
         this.typeSet = 0;
+    }
+
+    public clone(): Context {
+        const ctx = new Context(this.root);
+
+        ctx.typeSet = this.typeSet;
+        return ctx;
+    }
+
+    public evaluate(schema: Schema, identifier: string): void {
+        if (typeof schema === 'boolean')
+            this.otherConditions.push(schema ? `${identifier}!==undefined` : `${identifier}===undefined`);
+        else {
+            const { keywords } = this.root;
+            // eslint-disable-next-line
+            for (const key in schema) keywords[key]?.(this, schema, identifier);
+        }
     }
 
     public addType(type: string | undefined): void {

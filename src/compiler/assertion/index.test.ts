@@ -10,8 +10,6 @@ const ignoredSuites = [
   // eslint-disable-next-line
   'format',
   // eslint-disable-next-line
-  'oneOf', 'anyOf', 'allOf',
-  // eslint-disable-next-line
   'definitions', 'default', 'dependencies',
   // eslint-disable-next-line
   'enum', 'const', 'uniqueItems'
@@ -27,14 +25,17 @@ for (const suiteName in suitesMap) {
   for (let i = 0, suiteLen = suites.length; i < suiteLen; ++i) {
     const suite = suites[i];
 
+    const args: Parameters<typeof evaluate> = [suite.schema, keywords.draft6, {
+      noArrayObject: true,
+      strictStringWidth: true,
+      strictPropertyCheck: true,
+      unicodeAwareRegex: true,
+      accurateMultipleOf: true,
+      noNonFiniteNumber: true
+    }];
+
     try {
-      const fn = evaluate(suite.schema, keywords.draft6, {
-        noArrayObject: true,
-        strictStringWidth: true,
-        strictPropertyCheck: true,
-        unicodeAwareRegex: true,
-        accurateMultipleOf: true
-      });
+      const fn = evaluate(...args);
 
       describe(suite.description, () => {
         describe(`Schema: ${JSON.stringify(suite.schema, null, 4)}`, () => {
@@ -57,12 +58,8 @@ for (const suiteName in suitesMap) {
     } catch (e) {
       console.error(e.message);
       console.error(`Compile error of schema: ${JSON.stringify(suite.schema, null, 4)}`);
-      console.error(inspect(suite.schema, keywords.draft6, {
-        noArrayObject: true,
-        strictStringWidth: true,
-        unicodeAwareRegex: true,
-        accurateMultipleOf: true
-      }));
+      console.error(inspect(...args));
+
       process.exit(1);
     }
   }
