@@ -2,12 +2,40 @@ import { arrayCode, boolCode, intCode, nullCode, numberCode, objectCode, stringC
 import type { Schema } from '../../types/schema';
 
 export interface Options {
+    /**
+     * Does not count `Number.NaN`, `Number.POSITIVE_INFINITY` and `Number.NEGATIVE_INFINITY` as valid numbers
+     */
     noNonFiniteNumber?: boolean;
+
+    /**
+     * Handle string width correctly for Unicode characters
+     */
     strictStringWidth?: boolean;
+
+    /**
+     * Use `Object.hasOwn` instead of directly accessing the property and check its value
+     */
     strictPropertyCheck?: boolean;
+
+    /**
+     * Array does not count as objects
+     */
     noArrayObject?: boolean;
+
+    /**
+     * Handle `multipleOf` keyword correctly for numbers below 1
+     */
     accurateMultipleOf?: boolean;
+
+    /**
+     * Handle Unicode regular expressions correctly
+     */
     unicodeAwareRegex?: boolean;
+
+    /**
+     * Directly use `Set#size` for `uniqueItems` comparisons and `Array#includes` for `enum` comparisons
+     */
+    fastAssertions?: boolean;
 }
 
 export class RootContext {
@@ -15,6 +43,11 @@ export class RootContext {
      * Store all functions in the scope
      */
     public readonly declarations: string[];
+
+    /**
+     * Store all imported symbols
+     */
+    public readonly importMap: Record<any, string>;
 
     /**
      * Compiler options
@@ -29,6 +62,7 @@ export class RootContext {
     public constructor(options: Options, keywordMap: KeywordMapping) {
         this.keywords = keywordMap;
         this.declarations = [];
+        this.importMap = {};
 
         options.noNonFiniteNumber ??= false;
         options.strictStringWidth ??= false;
@@ -36,9 +70,16 @@ export class RootContext {
         options.noArrayObject ??= false;
         options.accurateMultipleOf ??= false;
         options.unicodeAwareRegex ??= false;
+        options.fastAssertions ??= false;
 
         // @ts-expect-error Unset properties have been handled previously
         this.options = options;
+    }
+
+    public includeFunc(value: (...args: any[]) => any): string {
+        // @ts-expect-error Map value pointers
+        // eslint-disable-next-line
+        return this.importMap[value] ??= this.addFunc(value.toString());
     }
 
     public addDeclaration(value: any): string {
@@ -63,12 +104,8 @@ export class RootContext {
         if (schema === false) return `${identifier}===undefined`;
         if (schema === true) return `${identifier}!==undefined`;
 
-        const { keywords } = this;
-
         const ctx = new Context(this);
-        // eslint-disable-next-line
-        for (const key in schema) keywords[key]?.(ctx, schema, identifier);
-
+        ctx.evaluate(schema, identifier);
         return ctx.finalize(identifier);
     }
 }
@@ -83,6 +120,9 @@ export class Context {
     public readonly objectConditions: string[];
     public readonly otherConditions: string[];
 
+    // Custom state
+    public hasArrayItems: boolean;
+
     // Track whether a type has been specified
     private typeSet: number;
 
@@ -92,6 +132,8 @@ export class Context {
         this.arrayConditions = [];
         this.objectConditions = [];
         this.otherConditions = [];
+
+        this.hasArrayItems = false;
 
         this.root = root;
         this.typeSet = 0;
@@ -109,9 +151,17 @@ export class Context {
             this.otherConditions.push(schema ? `${identifier}!==undefined` : `${identifier}===undefined`);
         else {
             const { keywords } = this.root;
-            // eslint-disable-next-line
-            for (const key in schema) keywords[key]?.(this, schema, identifier);
+
+            for (let i = 0, { length } = keywords; i < length; ++i) {
+                const words = keywords[i];
+                // eslint-disable-next-line
+                for (const key in schema) words[key]?.(this, schema, identifier);
+            }
         }
+    }
+
+    public getRegexString(key: string): string {
+        return (this.root.options.unicodeAwareRegex ? new RegExp(key, 'u') : new RegExp(key)).toString();
     }
 
     public addType(type: string | undefined): void {
@@ -151,6 +201,7 @@ export class Context {
     }
 
     public finalize(identifier: string): string {
+        // Finalize conditions
         const finalConditions = [];
         const { typeSet } = this;
 

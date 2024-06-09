@@ -6,13 +6,16 @@ const suitesMap = await loadSuites('draft6');
 
 const ignoredSuites = [
   // eslint-disable-next-line
-  'refRemote', 'ref', 'infinite-loop-detection',
+  'ref',
   // eslint-disable-next-line
   'format',
   // eslint-disable-next-line
   'definitions', 'default', 'dependencies',
   // eslint-disable-next-line
-  'enum', 'const', 'uniqueItems'
+  // These suites cannot be supported without using network requests
+  'refRemote', 'definitions',
+  // I don't care that's skill issue
+  'infinite-loop-detection'
 ];
 
 const selectedSuite: string | null = null;
@@ -31,7 +34,8 @@ for (const suiteName in suitesMap) {
       strictPropertyCheck: true,
       unicodeAwareRegex: true,
       accurateMultipleOf: true,
-      noNonFiniteNumber: true
+      noNonFiniteNumber: true,
+      fastAssertions: false
     }];
 
     try {
