@@ -1,4 +1,4 @@
-import { evaluate, inspect, keywords } from '.';
+import { evaluate, keywords } from '.';
 import { expect, describe, test } from 'bun:test';
 import loadSuites from '../../../tests';
 
@@ -6,11 +6,9 @@ const suitesMap = await loadSuites('draft6');
 
 const ignoredSuites = [
   // eslint-disable-next-line
-  'ref',
-  // eslint-disable-next-line
   'format',
   // eslint-disable-next-line
-  'definitions', 'default', 'dependencies',
+  'ref',
   // eslint-disable-next-line
   // These suites cannot be supported without using network requests
   'refRemote', 'definitions',
@@ -62,8 +60,7 @@ for (const suiteName in suitesMap) {
     } catch (e) {
       console.error(e.message);
       console.error(`Compile error of schema: ${JSON.stringify(suite.schema, null, 4)}`);
-      console.error(inspect(...args));
-
+      console.error(`${suiteName} > ${suite.description}`);
       process.exit(1);
     }
   }

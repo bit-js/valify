@@ -123,6 +123,26 @@ const mapping: KeywordMapping = [
             ).join('&&')})`);
         },
 
+        dependencies: (ctx, { dependencies }, identifier) => {
+            const { objectConditions } = ctx;
+
+            for (const key in dependencies) {
+                const dependency = dependencies[key];
+
+                if (Array.isArray(dependency)) {
+                    if (dependency.length === 0) continue;
+
+                    objectConditions.push(ctx.root.options.strictPropertyCheck
+                        ? `(!Object.hasOwn(${identifier},${JSON.stringify(key)})||${dependency.map((k) => `Object.hasOwn(${identifier},${JSON.stringify(k)})`).join('&&')})`
+                        : `(${accessor(identifier, key)}===undefined||${dependency.map((k) => `${accessor(identifier, k as string)}!==undefined`).join('&&')})`);
+                } else {
+                    objectConditions.push(ctx.root.options.strictPropertyCheck
+                        ? `(!Object.hasOwn(${identifier},${JSON.stringify(key)})||${ctx.root.compileConditions(dependency as Schema, identifier)})`
+                        : `(${accessor(identifier, key)}===undefined||${ctx.root.compileConditions(dependency as Schema, identifier)})`);
+                }
+            }
+        },
+
         propertyNames: (ctx, parentSchema, identifier) => {
             ctx.objectConditions.push(`Object.keys(${identifier}).every((k)=>${ctx.root.compileConditions(parentSchema.propertyNames!, 'k')})`);
         },

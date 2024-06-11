@@ -45,6 +45,11 @@ export class RootContext {
     public readonly declarations: string[];
 
     /**
+     * Store the root schema
+     */
+    public readonly target: Schema;
+
+    /**
      * Store all imported symbols
      */
     public readonly importMap: Record<any, string>;
@@ -59,8 +64,10 @@ export class RootContext {
      */
     public readonly keywords: KeywordMapping;
 
-    public constructor(options: Options, keywordMap: KeywordMapping) {
+    public constructor(schema: Schema, options: Options, keywordMap: KeywordMapping) {
+        this.target = schema;
         this.keywords = keywordMap;
+
         this.declarations = [];
         this.importMap = {};
 
@@ -108,6 +115,11 @@ export class RootContext {
         ctx.evaluate(schema, identifier);
         return ctx.finalize(identifier);
     }
+
+    public evaluate(): string {
+        const conditions = this.compileConditions(this.target, 'x');
+        return `${this.declarations.join(';')};return function x0(x){return ${conditions}};`;
+    }
 }
 
 export class Context {
@@ -141,7 +153,6 @@ export class Context {
 
     public clone(): Context {
         const ctx = new Context(this.root);
-
         ctx.typeSet = this.typeSet;
         return ctx;
     }

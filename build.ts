@@ -12,7 +12,10 @@ Bun.build({
     format: 'esm',
     target: 'bun',
     outdir: './lib',
-    entrypoints: ['./src/index.ts'],
+    entrypoints: [
+        './src/index.ts',
+        './src/compiler/assertion/index.ts'
+    ],
     minify: {
         whitespace: true
     },
