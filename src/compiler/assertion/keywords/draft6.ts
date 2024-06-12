@@ -159,8 +159,18 @@ const mapping: KeywordMapping = [
             const { objectConditions } = ctx;
             const { strictPropertyCheck } = ctx.root.options;
 
-            const { required } = parentSchema;
-            for (let i = 0, { length } = required!; i < length; ++i) objectConditions.push(strictPropertyCheck ? `Object.hasOwn(${identifier},${JSON.stringify(required![i])})` : `${accessor(identifier, required![i])}!==undefined`);
+            const { required, properties } = parentSchema;
+
+            if (properties === undefined)
+                for (let i = 0, { length } = required!; i < length; ++i) objectConditions.push(strictPropertyCheck ? `Object.hasOwn(${identifier},${JSON.stringify(required![i])})` : `${accessor(identifier, required![i])}!==undefined`);
+            else {
+                for (let i = 0, { length } = required!; i < length; ++i) {
+                    const key = required![i];
+
+                    if (strictPropertyCheck) objectConditions.push(`Object.hasOwn(${identifier},${JSON.stringify(key)})`);
+                    else if (!Object.hasOwn(properties, key) || properties[key] === false) objectConditions.push(`${accessor(identifier, required![i])}!==undefined`);
+                }
+            }
         },
 
         properties: (ctx, parentSchema, identifier) => {
