@@ -87,4 +87,8 @@ evaluate(User, keywords.draft6, {
 });
 ```
 
-Currently only draft 6 schemas are supported.
+## Note
+
+This library is experimental and still in active development.
+
+Currently only draft 6 keywords (without `format`, `$ref` and `$id` keywords) are supported.
